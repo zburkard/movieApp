@@ -22,6 +22,7 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
+  const [isSearching, setIsSearching] = useState(false);
 
   const fetchMovies = async (page = 1) => {
     setIsLoading(true);
@@ -60,6 +61,56 @@ const App = () => {
 
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
+    if (isSearching) {
+      searchMovies(searchTerm, newPage);
+    } else {
+      fetchMovies(newPage);
+    }
+  };
+
+  const searchMovies = async (query, page = 1) => {
+    setIsLoading(true);
+    setErrorMessage('');
+    setIsSearching(true);
+    try {
+      const endpoint = `${API_BASE_URL}/search/movie?query=${encodeURIComponent(query)}&page=${page}`;
+
+      const response = await fetch(endpoint, API_OPTIONS);
+
+      if(!response.ok) {
+        throw new Error('Failed to search movies');
+      }
+      const data = await response.json();
+
+      console.log('Search API Response Data:', data);
+
+      if(data.Response === 'False'){
+        setErrorMessage(data.Error || 'No movies found');
+        setMovieList([]);
+        return
+      }
+      setMovieList(data.results || []);
+      setTotalPages(data.total_pages || 0);
+      setCurrentPage(page);
+    } catch (error) {
+      console.error('Error searching movies:', error);
+      setErrorMessage('Error searching movies. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSearch = (query) => {
+    if (query.trim()) {
+      searchMovies(query, 1);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setIsSearching(false);
+    setCurrentPage(1);
+    fetchMovies(1);
   };
   return (
     <main>
@@ -70,10 +121,20 @@ const App = () => {
           <h1>
             Find <span className="text-gradient">Movies</span> You'll Enjoy Without The Hassle
           </h1>
-          <Search searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+          <Search searchTerm={searchTerm} setSearchTerm={setSearchTerm} onSearch={handleSearch} />
         </header>
         <section>
-          <h2 className="mt-[40px]">All Movies</h2>
+          <div className="flex justify-between items-center mt-[40px]">
+            <h2>{isSearching ? `Search Results for "${searchTerm}"` : 'All Movies'}</h2>
+            {isSearching && (
+              <button
+                onClick={handleClearSearch}
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Clear Search
+              </button>
+            )}
+          </div>
           {isLoading ? (
             <Spinner/>
           ): errorMessage ? (
